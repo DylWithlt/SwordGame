@@ -5,4 +5,6 @@ for _, module in ipairs(script:GetChildren()) do
 
     if not module.Init then continue end
     module.Init()
+
+    --Boop
 end
