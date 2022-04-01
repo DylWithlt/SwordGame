@@ -20,14 +20,6 @@ viewRayParams.IgnoreWater = true
 
 local viewRange = 250
 
-local function ClearChildrenOfClass(parent, class)
-    for i,v in ipairs(parent:GetChildren()) do
-        if v:IsA(class) then
-            v:Destroy()
-        end
-    end
-end
-
 local function getEnemyOnScreen()
 	local closestValue = math.huge
 	local currentTarget
@@ -75,7 +67,7 @@ function Hud.Init()
 	self.sounds = self.ui:WaitForChild("Sounds")
 	self.clones = self.ui:WaitForChild("Clones")
     
-    for i,v in ipairs(self.hud:GetChildren()) do
+    for _,v in ipairs(self.hud:GetChildren()) do
         self[v.Name] = v
     end
     ------------------------------------------------------------------------
