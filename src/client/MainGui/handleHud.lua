@@ -7,13 +7,10 @@ local camera = game.Workspace.CurrentCamera
 
 local player = players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
-local character = player.Character or player.CharacterAdded:Wait()
-player.CharacterAdded:Connect(function(chr)
-	character = chr
-end)
 
-local hud = {}
-hud.__index = hud
+local Hud = {}
+Hud.__index = Hud
+
 local util = require(game.ReplicatedStorage.Common.Util)
 local userDataChangedRemote = util.awaitRemote("userDataChanged")
 
@@ -22,9 +19,6 @@ viewRayParams.FilterType = Enum.RaycastFilterType.Blacklist
 viewRayParams.IgnoreWater = true
 
 local viewRange = 250
-
-sgui:SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
-sgui:SetCoreGuiEnabled(Enum.CoreGuiType.Chat, true)
 
 local function ClearChildrenOfClass(parent, class)
     for i,v in ipairs(parent:GetChildren()) do
@@ -37,36 +31,39 @@ end
 local function getEnemyOnScreen()
 	local closestValue = math.huge
 	local currentTarget
-	local enemies = game.Workspace.Enemies:GetChildren()
+	local enemies = workspace.Enemies:GetChildren()
 
-	for i,enemy in pairs(enemies) do
-		if enemy:IsA("Model") then
-			local enemyHumanoid = enemy:FindFirstChildOfClass("Humanoid")
-			if (not enemyHumanoid) or enemyHumanoid.Health <= 0 then continue end
+	for _,enemy in ipairs(enemies) do
+		if not enemy:IsA("Model") then continue end
 
-			viewRayParams.FilterDescendantsInstances = {character, enemy, workspace.Ignore}
-			local ray = workspace:Raycast(camera.CFrame.Position, (enemy.PrimaryPart.Position - camera.CFrame.Position).Unit * (camera.CFrame.Position - enemy.PrimaryPart.Position).Magnitude, viewRayParams)
-			local pos, onScreen = camera:WorldToScreenPoint(enemy.PrimaryPart.Position)
+		local enemyHumanoid = enemy:FindFirstChildOfClass("Humanoid")
+		if (not enemyHumanoid) or enemyHumanoid.Health <= 0 then continue end
 
-			if ray or not onScreen then continue end
+		viewRayParams.FilterDescendantsInstances = {player.Character, enemy, workspace.Ignore}
+		local ray = workspace:Raycast(camera.CFrame.Position, (enemy.PrimaryPart.Position - camera.CFrame.Position).Unit * (camera.CFrame.Position - enemy.PrimaryPart.Position).Magnitude, viewRayParams)
+		local pos, onScreen = camera:WorldToScreenPoint(enemy.PrimaryPart.Position)
 
-			local center = camera.ViewportSize / 2
-			local screenPoint = Vector2.new(pos.X, pos.Y)
-			local dist = (screenPoint - center).Magnitude
+		if ray or not onScreen then continue end
 
-			if pos.Z < viewRange and dist < closestValue then
-				closestValue = dist
-				currentTarget = enemyHumanoid
-			end
+		local center = camera.ViewportSize / 2
+		local screenPoint = Vector2.new(pos.X, pos.Y)
+		local dist = (screenPoint - center).Magnitude
+
+		if pos.Z < viewRange and dist < closestValue then
+			closestValue = dist
+			currentTarget = enemyHumanoid
 		end
 	end
 
 	return currentTarget
 end
 
-function hud.Init()
-	local self = setmetatable({}, hud)
-	
+function Hud.Init()
+	local self = setmetatable({}, Hud)
+
+	sgui:SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
+	sgui:SetCoreGuiEnabled(Enum.CoreGuiType.Chat, true)
+
     local logLevel = 0
     local logEnemy = nil
     self.currentEnemy = nil
@@ -80,12 +77,16 @@ function hud.Init()
     
     for i,v in ipairs(self.hud:GetChildren()) do
         self[v.Name] = v
-        print(i, v)
     end
     ------------------------------------------------------------------------
 
-	userDataChangedRemote.OnClientEvent:Connect(function(data) -- update ui when data is changed
-		local humanoid = character:WaitForChild("Humanoid")
+	userDataChangedRemote.OnClientEvent:Connect(function(data) -- update ui when data is changed\
+		local character = player.Character
+		if not character then return end
+
+		local humanoid = character:FindFirstChild("Humanoid")
+		if not humanoid then return end
+
         --// Displays Health //--
         local playerHealth = humanoid.Health
         local playerHealthScale = humanoid.Health / humanoid.MaxHealth
@@ -117,7 +118,7 @@ function hud.Init()
     end)
 end
 
-function hud:levelUp(levelReached)
+function Hud:levelUp(levelReached)
     local effectClone = self.LevelUpScreen:Clone()
     local numbers = string.split(levelReached, "")
 
@@ -154,7 +155,7 @@ end
 local currentEnemyUi = nil
 local onHealthChanged = nil
 
-function hud:showEnemyUi()
+function Hud:showEnemyUi()
     local t = self.currentEnemy
 	local ti = TweenInfo.new(0.15, Enum.EasingStyle.Linear)
 	self.DisplayEnemyLevel.Visible = false
@@ -176,7 +177,7 @@ function hud:showEnemyUi()
 		end
 		
 		ts:Create(oldUi, ti, {BackgroundTransparency = 1}):Play()
-		delay(0.75, function()
+		task.delay(0.75, function()
 			oldUi:Destroy()
 		end)
 	end
@@ -273,4 +274,4 @@ function hud:showEnemyUi()
 	end
 end
 
-return hud
+return Hud
