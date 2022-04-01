@@ -12,19 +12,20 @@ local userDataChangedRemote = Util.createRemote("userDataChanged", "RemoteEvent"
 local UserCache = {}
 
 function User.Init()
-    Players.PlayerAdded:Connect(function(Player)
-        local _user = User.new(Player)
-        UserCache[tostring(Player.UserId)] = _user
+	Players.PlayerAdded:Connect(function(Player)
+		local id = tostring(Player.UserId)
+		local _user = User.new(Player)
+		UserCache[id] = _user
+		UserCache[id]:LoadData()
     end)
 end
 
 function User.GetUser(userId)
-    return UserCache[userId]
+	return UserCache[tostring(userId)]
 end
 
 function User.new(Player)
     local self = setmetatable({}, User)
-
     self.Player = Player
     self.Data = {
         exp = {current = 0, goal = 0}; -- goal = 100 + (level/1.25) * 75
@@ -35,14 +36,13 @@ function User.new(Player)
     }
     self.Keybinds = {} -- {actionname = "Action", keys = {Enum.KeyCode.A}}
 
-    self:LoadData()
     updateUserRemote:FireClient(self.Player, self.Keybinds)
 
     return self
 end
 
 function User.SetData(player, change)
-    if not change then return end
+	if not change then return end
 	local plyr = User.GetUser(player.UserId)
     for key,value in pairs(change) do
 		if not plyr.Data[key] then continue end
