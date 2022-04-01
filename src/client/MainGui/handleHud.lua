@@ -101,7 +101,7 @@ function hud.init()
         self.PlayerLevelBar.LevelDisplay.Text = 'LEVEL: <font color="rgb(205, 255, 225)">' .. data.level .. '</font>'
 
         if data.level > logLevel and logLevel ~= 0 then
-            self.levelUp(data.level)
+            self:levelUp(data.level)
         end
         logLevel = data.level
     end)
@@ -109,12 +109,10 @@ function hud.init()
     local onRender = rs.RenderStepped:Connect(function()
         currentEnemy = self:getEnemyOnScreen()
         if currentEnemy ~= logEnemy then
-            self.showEnemyUi(currentEnemy)
-        end
+            self:showEnemyUi(currentEnemy)
+		end
+		logEnemy = currentEnemy
     end)
-	logEnemy = currentEnemy
-	
-	return self
 end
 
 function hud:levelUp(levelReached)
