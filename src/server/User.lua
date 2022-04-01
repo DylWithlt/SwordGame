@@ -22,6 +22,7 @@ function User.Init()
         local id = tostring(Player.UserId)
 		local _user = UserCache[id]
 		_user:SaveData()
+        table.remove(UserCache, id)
     end)
 end
 
@@ -36,8 +37,8 @@ function User.new(Player)
         exp = {current = 0, goal = 0}; -- goal = 100 + (level/1.25) * 75
         level = 1;
         questId = 0;
-        inventory = {};
-        equipped = {}
+        inventory = {"Eternal"};
+        equipped = {Weapon = ""; Potion = ""; Mod = ""; Hat = ""; Shirt = ""; Pants = "";}
     }
     self.Keybinds = {} -- {actionname = "Action", keys = {Enum.KeyCode.A}}
 
