@@ -17,7 +17,6 @@ local userDataChangedRemote = util.awaitRemote("userDataChanged")
 local viewRayParams = RaycastParams.new()
 viewRayParams.FilterType = Enum.RaycastFilterType.Blacklist
 viewRayParams.IgnoreWater = true
-
 local viewRange = 250
 
 local function getEnemyOnScreen()
@@ -51,12 +50,6 @@ local function getEnemyOnScreen()
 end
 
 function Hud.Init()
-	local self = setmetatable({}, Hud)
-
-	sgui:SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
-	sgui:SetCoreGuiEnabled(Enum.CoreGuiType.Chat, true)
-
-    local logLevel = 0
     local logEnemy = nil
     self.currentEnemy = nil
 
@@ -101,7 +94,7 @@ function Hud.Init()
         logLevel = data.level
     end)
 
-    local onRender = rs.RenderStepped:Connect(function()
+    rs.RenderStepped:Connect(function()
         self.currentEnemy = getEnemyOnScreen()
         if self.currentEnemy ~= logEnemy then
             self:showEnemyUi()
