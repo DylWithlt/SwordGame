@@ -42,6 +42,7 @@ function User.new(Player)
 end
 
 function User.SetData(player, change)
+    if not change then return end
 	local plyr = User.GetUser(player.UserId)
     for key,value in pairs(change) do
 		if not plyr.Data[key] then continue end
@@ -59,7 +60,7 @@ function User:LoadData()
     if not storedData then return end
 
     local LoadedData = storedData -- insert datastore here
-    self.SetData(LoadedData)
+    self.SetData(self.Player,LoadedData)
 end
 
 function User:SaveData()
