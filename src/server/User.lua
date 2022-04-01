@@ -41,21 +41,22 @@ function User.new(Player)
     return self
 end
 
-function User.SetData(change)
+function User.SetData(player, change)
+	local plyr = User.GetUser(player.UserId)
     for key,value in pairs(change) do
-        if not self.Data[key] then continue end
-        self.Data[key] = value
+		if not plyr.Data[key] then continue end
+		plyr.Data[key] = value
     end
-    userDataChangedRemote:FireClient(self.Player, self.Data)
+	userDataChangedRemote:FireClient(plyr.Player, plyr.Data)
 end
 
 function User:LoadData()
 	local storeTag = "Player_".. self.Player.UserId
 
-	local dataStore = ds:GetDataStore("PlayerData", storeTag)
+	local dataStore = DataStoreService:GetDataStore("PlayerData", storeTag)
     local storedData = dataStore:GetAsync(storeTag)
 
-    if not storedData then continue end
+    if not storedData then return end
 
     local LoadedData = storedData -- insert datastore here
     self.SetData(LoadedData)
@@ -63,7 +64,7 @@ end
 
 function User:SaveData()
     local storeTag = "Player_".. self.Player.UserId
-	local dataStore = ds:GetDataStore("PlayerData", storeTag)
+	local dataStore = DataStoreService:GetDataStore("PlayerData", storeTag)
 
     local s, e = pcall(function()
 		dataStore:SetAsync(storeTag, self.Data)
