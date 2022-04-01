@@ -13,8 +13,9 @@ player.CharacterAdded:Connect(function(chr)
 end)
 
 local hud = {}
+hud.__index = hud
 local util = require(game.ReplicatedStorage.Common.Util)
-local userDataChangedRemote = util.awaitRemote("UserDataChanged")
+local userDataChangedRemote = util.awaitRemote("userDataChanged")
 
 local viewRayParams = RaycastParams.new()
 viewRayParams.FilterType = Enum.RaycastFilterType.Blacklist
@@ -63,12 +64,12 @@ local function getEnemyOnScreen()
 	return currentTarget
 end
 
-function hud.init()
+function hud.Init()
 	local self = setmetatable({}, hud)
 	
     local logLevel = 0
     local logEnemy = nil
-    local currentEnemy = nil
+    self.currentEnemy = nil
 
     --Get UI----------------------------------------------------------------
 
@@ -78,7 +79,8 @@ function hud.init()
 	self.clones = self.ui:WaitForChild("Clones")
     
     for i,v in ipairs(self.hud:GetChildren()) do
-        self[i] = v
+        self[v.Name] = v
+        print(i, v)
     end
     ------------------------------------------------------------------------
 
@@ -90,7 +92,7 @@ function hud.init()
         
         self.PlayerHealthBar.HpBar.Size = UDim2.new(playerHealthScale, 0,2,0)
         self.PlayerHealthBar.Health.Text = math.floor(playerHealth)
-    
+
         --// displays exp, max exp, and level //--
         local expScale = math.clamp(data.exp.current / data.exp.goal, 0, data.exp.goal)
         self.PlayerLevelBar.ExpBar:TweenSize(UDim2.new(expScale, 0, 2, 0) , Enum.EasingDirection.Out, Enum.EasingStyle.Quint, 0.35, true)
@@ -107,11 +109,11 @@ function hud.init()
     end)
 
     local onRender = rs.RenderStepped:Connect(function()
-        currentEnemy = self:getEnemyOnScreen()
-        if currentEnemy ~= logEnemy then
-            self:showEnemyUi(currentEnemy)
+        self.currentEnemy = getEnemyOnScreen()
+        if self.currentEnemy ~= logEnemy then
+            self:showEnemyUi()
 		end
-		logEnemy = currentEnemy
+		logEnemy = self.currentEnemy
     end)
 end
 
@@ -152,7 +154,8 @@ end
 local currentEnemyUi = nil
 local onHealthChanged = nil
 
-function hud:showEnemyUi(t)
+function hud:showEnemyUi()
+    local t = self.currentEnemy
 	local ti = TweenInfo.new(0.15, Enum.EasingStyle.Linear)
 	self.DisplayEnemyLevel.Visible = false
 	if onHealthChanged then

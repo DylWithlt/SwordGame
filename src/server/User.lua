@@ -18,6 +18,11 @@ function User.Init()
 		UserCache[id] = _user
 		UserCache[id]:LoadData()
     end)
+    Players.PlayerRemoving:Connect(function(Player)
+        local id = tostring(Player.UserId)
+		local _user = UserCache[id]
+		_user:SaveData()
+    end)
 end
 
 function User.GetUser(userId)
@@ -54,7 +59,7 @@ end
 function User:LoadData()
 	local storeTag = "Player_".. self.Player.UserId
 
-	local dataStore = DataStoreService:GetDataStore("PlayerData", storeTag)
+	local dataStore = DataStoreService:GetDataStore("PlayerStats", storeTag)
     local storedData = dataStore:GetAsync(storeTag)
 
     if not storedData then return end
@@ -65,7 +70,7 @@ end
 
 function User:SaveData()
     local storeTag = "Player_".. self.Player.UserId
-	local dataStore = DataStoreService:GetDataStore("PlayerData", storeTag)
+	local dataStore = DataStoreService:GetDataStore("PlayerStats", storeTag)
 
     local s, e = pcall(function()
 		dataStore:SetAsync(storeTag, self.Data)
