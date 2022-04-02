@@ -34,4 +34,18 @@ function Util.InitializeChildren(parent)
     end
 end
 
+function Util.debounce(waitTime, func)
+    local db = false
+
+    return function(...)
+        if db then return end
+        db = true
+
+        func(...)
+        if waitTime > 0 then task.wait(waitTime) end
+
+        db = false
+    end
+end
+
 return Util

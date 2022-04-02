@@ -10,10 +10,12 @@ local Client = Player.PlayerScripts.Client
 
 local SidePanelHud = require(Client.MainGui.SidePanelHud)
 
+local hideTi = TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+
 function HelpMenu.Activate()
     local lastMenu = SidePanelHud.currMenu
     SidePanelHud.HideCurrMenu()
-    if HelpMenu.Menu == lastMenu then return end
+    if HelpMenu == lastMenu then return end
 
     SidePanelHud.currMenu = HelpMenu
 
@@ -25,7 +27,8 @@ function HelpMenu.Activate()
 end
 
 function HelpMenu.Deactivate()
-    
+    SidePanelHud.TweenMenuAway(HelpMenu.Menu)
+    SidePanelHud.currMenu = nil
 end
 
 function HelpMenu.Init()

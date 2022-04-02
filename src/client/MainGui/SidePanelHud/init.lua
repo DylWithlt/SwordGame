@@ -19,7 +19,8 @@ local buttonsShown = false
 local panelButtonBinds = {}
 
 SidePanelHud.currMenu = nil
-local hideTi = TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+local tweenTime = 0.25
+local hideTi = TweenInfo.new(tweenTime, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
 
 function SidePanelHud.BindButton(buttonName, func, menu)
     -- Find Gui Button
@@ -33,22 +34,23 @@ function SidePanelHud.BindButton(buttonName, func, menu)
     table.insert(panelButtonBinds, button.MouseButton1Down:Connect(func))
 end
 
-function SidePanelHud.HideCurrMenu(menu) -- TODO: Make it call Deactivate Instead.
+function SidePanelHud.HideCurrMenu() -- TODO: Make it call Deactivate Instead.
     if not SidePanelHud.currMenu then return end
-    local toTween = SidePanelHud.currMenu
+    
+    if not SidePanelHud.currMenu.Deactivate then return end
+    SidePanelHud.currMenu.Deactivate()
+end
 
-    local lastPosition = toTween.Position
-    local tween = TweenService:Create(toTween, hideTi, {Position = UDim2.new(SidePanelHud.currMenu.Position.X.Scale, 0, 2, 0)})
+function SidePanelHud.TweenMenuAway(gui)
+    local lastPosition = gui.Position
+    local tween = TweenService:Create(gui, hideTi, {Position = UDim2.new(gui.Position.X.Scale, 0, 2, 0)})
     tween:Play()
-    local con; con = tween.Completed:Connect(function(pbs)
-        if pbs == Enum.PlaybackState.Cancelled then return end
 
-        toTween.Visible = false
-        toTween.Position = lastPosition
-        con:Disconnect()
-    end)
+    tween.Completed:Wait()
+    if tween.PlaybackState == Enum.PlaybackState.Cancelled then return end
 
-    SidePanelHud.currMenu = nil
+    gui.Visible = false
+    gui.Position = lastPosition
 end
 
 function SidePanelHud.Init()

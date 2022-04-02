@@ -3,6 +3,7 @@ local InventoryMenu = {}
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local rs = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Player = Players.LocalPlayer
 local playerGui = Player:WaitForChild("PlayerGui")
@@ -12,8 +13,9 @@ local camera = workspace.CurrentCamera
 local Client = Player.PlayerScripts.Client
 
 local SidePanelHud = require(Client.MainGui.SidePanelHud)
+local debounce = false
 
-local isOpened = false
+local Util = require(ReplicatedStorage.Common.Util)
 
 function InventoryMenu.ShiftUIt(vector, shiftedUi)
 	for i,v in ipairs(shiftedUi:GetDescendants()) do
@@ -42,18 +44,52 @@ function InventoryMenu.ShiftUIt(vector, shiftedUi)
 	end
 end
 
-function InventoryMenu.Activate()
+InventoryMenu.Activate = Util.debounce(0, function()
     local lastMenu = SidePanelHud.currMenu
     SidePanelHud.HideCurrMenu()
-    if InventoryMenu.Menu == lastMenu then return end
+    if InventoryMenu == lastMenu then return end
 
-    SidePanelHud.currMenu = InventoryMenu.Menu
+    SidePanelHud.currMenu = InventoryMenu
 
     local currentPosition = InventoryMenu.Menu.Position
     InventoryMenu.Menu.Position = UDim2.new(InventoryMenu.Menu.Position.X.Scale, 0, 2, 0)
     InventoryMenu.Menu.Visible = true
-    TweenService:Create(InventoryMenu.Menu, SidePanelHud.ti, {Position = currentPosition}):Play()
-end
+    local tween = TweenService:Create(InventoryMenu.Menu, SidePanelHud.ti, {Position = currentPosition})
+    
+    rs:BindToRenderStep("FadeInventoryUi", 1, function()
+        if not Player.Character then return end
+
+        local maskVector = Vector3.new(1, 0, 1)
+
+        local camVector = camera.CFrame.LookVector * maskVector
+        local rightVector = camera.CFrame.RightVector * maskVector
+        local rootVector = Player.Character.PrimaryPart.CFrame.LookVector * maskVector
+
+        local back = (camVector - rootVector).Magnitude
+        local front = ((camVector * -1) - rootVector).Magnitude
+        local left = ((rightVector * -1) - rootVector).Magnitude
+        local right = ((rightVector) - rootVector).Magnitude
+
+        InventoryMenu.ShiftUIt(back, InventoryMenu.Slots.WeaponsSlot)
+        InventoryMenu.ShiftUIt(front, InventoryMenu.Slots.OutfitSlot)
+        InventoryMenu.ShiftUIt(left, InventoryMenu.Slots.ModsSlot)
+        InventoryMenu.ShiftUIt(right, InventoryMenu.Slots.PotionsSlot)
+    end)
+
+    tween:Play()
+    tween.Completed:Wait()
+end)
+
+InventoryMenu.Deactivate = Util.debounce(0, function()
+    for _,v in ipairs(InventoryMenu.Slots:GetChildren()) do
+        v.Enabled = false
+    end
+
+    rs:UnbindFromRenderStep("FadeInventoryUi")
+
+    SidePanelHud.TweenMenuAway(InventoryMenu.Menu)
+    SidePanelHud.currMenu = nil
+end)
 
 function InventoryMenu.Init()
     InventoryMenu.ui = playerGui:WaitForChild("PlayerUI")
@@ -66,7 +102,7 @@ function InventoryMenu.Init()
 
     -- Create equip slots and handle fading effect
     local character = Player.character
-    local characterRoot = character.HumanoidRootPart
+    local characterRoot = character:WaitForChild("HumanoidRootPart", 3)
 
     local rootAttachemtns = {
         attWeapon = Instance.new("Attachment");
@@ -91,50 +127,6 @@ function InventoryMenu.Init()
         slot.Adornee = v
         slot.Enabled = false
     end
-    
-    rs.RenderStepped:Connect(function()
-        if InventoryMenu.Menu.Visible then
-            isOpened = true
-            local camVector = Vector3.new(camera.CFrame.LookVector.X, 0 ,camera.CFrame.LookVector.Z)
-            local rightVector = Vector3.new(camera.CFrame.RightVector.X, 0 ,camera.CFrame.RightVector.Z)
-            local rootVector = Vector3.new(character.PrimaryPart.CFrame.LookVector.X, 0, character.PrimaryPart.CFrame.LookVector.Z)
-    
-            local bv = (camVector - rootVector).Magnitude
-            local fv = ((camVector * -1) - rootVector).Magnitude
-            local lv = ((rightVector * -1) - rootVector).Magnitude
-            local rv = ((rightVector) - rootVector).Magnitude
-    
-            InventoryMenu.ShiftUIt(bv, InventoryMenu.Slots.WeaponsSlot)
-            InventoryMenu.ShiftUIt(fv, InventoryMenu.Slots.OutfitSlot)
-            InventoryMenu.ShiftUIt(lv, InventoryMenu.Slots.ModsSlot)
-            InventoryMenu.ShiftUIt(rv, InventoryMenu.Slots.PotionsSlot)
-            
-            ---- gets the current slot you are looking at
-            -- local t = {sword = bv, outfit = fv, mod = lv, potion = rv}
-            -- local currentHValue = math.huge
-            -- local cMenu = ""
-    
-            -- for i,v in pairs(t) do --Gets lowest value
-            --     if v < currentHValue then
-            --         currentHValue = v
-            --         cMenu = i
-            --     end
-            -- end
-    
-            -- local stringTable = {}
-            -- for i = 1, string.len(cMenu) do
-            --     stringTable[i] = string.upper(string.sub(cMenu, i,i))
-            -- end
-    
-            -- local menuTitleString = table.concat(stringTable, "  ")
-        elseif isOpened == true then
-            isOpened = false
-            for _,v in ipairs(InventoryMenu.Slots:GetChildren()) do
-                v.Enabled = false
-            end
-        end
-    end)
 end
-
 
 return InventoryMenu
