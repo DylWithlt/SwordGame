@@ -1,14 +1,11 @@
 local MainGui = {}
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Util = require(ReplicatedStorage.Common.Util)
+
 function MainGui.Init()
-    for _, module in ipairs(script:GetChildren()) do
-        if not module:IsA("ModuleScript") then continue end
-    
-        module = require(module)
-    
-        if not module.Init then continue end
-        module.Init()
-    end
+    Util.InitializeChildren(script)
 end
 
 return MainGui

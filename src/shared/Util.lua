@@ -23,4 +23,15 @@ function Util.ClearChildrenOfClass(parent, class)
     end
 end
 
+function Util.InitializeChildren(parent)
+    for _, module in ipairs(parent:GetChildren()) do
+        if not module:IsA("ModuleScript") then continue end
+
+        module = require(module)
+
+        if not module.Init then continue end
+        module.Init()
+    end
+end
+
 return Util

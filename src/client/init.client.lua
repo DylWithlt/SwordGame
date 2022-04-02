@@ -1,10 +1,5 @@
-for _, module in ipairs(script:GetChildren()) do
-    if not module:IsA("ModuleScript") then continue end
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-    module = require(module)
+local Util = require(ReplicatedStorage.Common.Util)
 
-    if not module.Init then continue end
-    module.Init()
-
-    --Boop
-end
+Util.InitializeChildren(script)

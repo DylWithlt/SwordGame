@@ -1,24 +1,29 @@
-local sgui = game:GetService("StarterGui")
-local rs = game:GetService("RunService")
-local players = game:GetService("Players")
-local ts = game:GetService("TweenService")
+local EnemyHUD = {}
 
+-- Services
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+
+-- Modules
+local EnemyData = require(ReplicatedStorage.Common.Data.EnemyData)
+
+-- Constants
+local VIEW_RANGE = 250
+
+-- Variables
 local camera = game.Workspace.CurrentCamera
 
-local player = players.LocalPlayer
+local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
-
-local Hud = {}
-Hud.__index = Hud
-
-local util = require(game.ReplicatedStorage.Common.Util)
-local userDataChangedRemote = util.awaitRemote("userDataChanged")
 
 local viewRayParams = RaycastParams.new()
 viewRayParams.FilterType = Enum.RaycastFilterType.Blacklist
 viewRayParams.IgnoreWater = true
-local viewRange = 250
 
+
+-- Finds the enemy closest to the center of the screen, that is also on the screen.
 local function getEnemyOnScreen()
 	local closestValue = math.huge
 	local currentTarget
@@ -40,7 +45,7 @@ local function getEnemyOnScreen()
 		local screenPoint = Vector2.new(pos.X, pos.Y)
 		local dist = (screenPoint - center).Magnitude
 
-		if pos.Z < viewRange and dist < closestValue then
+		if pos.Z < VIEW_RANGE and dist < closestValue then
 			closestValue = dist
 			currentTarget = enemyHumanoid
 		end
@@ -49,214 +54,181 @@ local function getEnemyOnScreen()
 	return currentTarget
 end
 
-function Hud.Init()
-    local logEnemy = nil
-    self.currentEnemy = nil
+local function GetUiSettings(currentUi)
+    local tbl = {}
+	for _, guiObj in ipairs(currentUi:GetDescendants()) do
+		if not guiObj:IsA("GuiObject") then continue end
+
+		local savedSettings = {object = guiObj; settings = {}}
+
+		if guiObj:IsA("Frame") then
+			savedSettings.settings.BackgroundTransparency = guiObj.BackgroundTransparency
+			guiObj.BackgroundTransparency = 1
+		elseif guiObj:IsA("ImageLabel") then
+			savedSettings.settings.BackgroundTransparency = guiObj.BackgroundTransparency
+			savedSettings.settings.ImageTransparency = guiObj.ImageTransparency
+			guiObj.BackgroundTransparency = 1
+			guiObj.ImageTransparency = 1
+		elseif guiObj:IsA("UIStroke") then
+			savedSettings.settings.Transparency =  guiObj.Transparency
+			guiObj.Transparency = 1
+		elseif guiObj:IsA("TextLabel") then
+			savedSettings.settings.BackgroundTransparency = guiObj.BackgroundTransparency
+			savedSettings.settings.TextTransparency = guiObj.TextTransparency
+			savedSettings.settings.TextStrokeTransparency = guiObj.TextStrokeTransparency
+			guiObj.BackgroundTransparency = 1
+			guiObj.TextTransparency = 1
+			guiObj.TextStrokeTransparency = 1
+		end
+
+		table.insert(tbl, savedSettings)
+	end
+
+	currentUi.BackgroundTransparency = 1
+    return tbl
+end
+
+function EnemyHUD.Init()
+    local lastEnemy = nil
+    EnemyHUD.currentEnemy = nil
 
     --Get UI----------------------------------------------------------------
 
-    self.ui = playerGui:WaitForChild("PlayerUI")
-	self.hud = self.ui:WaitForChild("PlayerHud")
-	self.sounds = self.ui:WaitForChild("Sounds")
-	self.clones = self.ui:WaitForChild("Clones")
-    
-    for _,v in ipairs(self.hud:GetChildren()) do
-        self[v.Name] = v
+    EnemyHUD.ui = playerGui:WaitForChild("PlayerUI")
+    EnemyHUD.hud = EnemyHUD.ui:WaitForChild("EnemyHud")
+	EnemyHUD.sounds = EnemyHUD.ui:WaitForChild("Sounds")
+	EnemyHUD.clones = EnemyHUD.ui:WaitForChild("Clones")
+
+    for _,v in ipairs(EnemyHUD.hud:GetChildren()) do
+        EnemyHUD[v.Name] = v
     end
     ------------------------------------------------------------------------
 
-	userDataChangedRemote.OnClientEvent:Connect(function(data) -- update ui when data is changed\
-		local character = player.Character
-		if not character then return end
+    EnemyHUD.enemyUiSettings = GetUiSettings(EnemyHUD.hud.EnemyBar)
+    EnemyHUD.bossUiSettings = GetUiSettings(EnemyHUD.hud.BossBar)
 
-		local humanoid = character:FindFirstChild("Humanoid")
-		if not humanoid then return end
-
-        --// Displays Health //--
-        local playerHealth = humanoid.Health
-        local playerHealthScale = humanoid.Health / humanoid.MaxHealth
-        
-        self.PlayerHealthBar.HpBar.Size = UDim2.new(playerHealthScale, 0,2,0)
-        self.PlayerHealthBar.Health.Text = math.floor(playerHealth)
-
-        --// displays exp, max exp, and level //--
-        local expScale = math.clamp(data.exp.current / data.exp.goal, 0, data.exp.goal)
-        self.PlayerLevelBar.ExpBar:TweenSize(UDim2.new(expScale, 0, 2, 0) , Enum.EasingDirection.Out, Enum.EasingStyle.Quint, 0.35, true)
-        
-        self.PlayerLevelBar.ExpCurrent.Text = data.exp.current
-        self.PlayerLevelBar.ExpTotal.Text = data.exp.goal
-        
-        self.PlayerLevelBar.LevelDisplay.Text = 'LEVEL: <font color="rgb(205, 255, 225)">' .. data.level .. '</font>'
-
-        if data.level > logLevel and logLevel ~= 0 then
-            self:levelUp(data.level)
-        end
-        logLevel = data.level
-    end)
-
-    rs.RenderStepped:Connect(function()
-        self.currentEnemy = getEnemyOnScreen()
-        if self.currentEnemy ~= logEnemy then
-            self:showEnemyUi()
-		end
-		logEnemy = self.currentEnemy
-    end)
-end
-
-function Hud:levelUp(levelReached)
-    local effectClone = self.LevelUpScreen:Clone()
-    local numbers = string.split(levelReached, "")
-
-    for i,v in ipairs(numbers) do
-        local imageNumber = effectClone.numbers:FindFirstChild(tostring(v)):Clone()
-        imageNumber.Parent = effectClone.DisplayLevel
-        imageNumber.Visible = true
-    end
-
-    effectClone.Parent = self.clones
-    effectClone.Visible = true
-
-    self.Sounds.LevelUp:Play()
-    self.Sounds.Bass:Play()
+	EnemyHUD.enemyIcons = {
+		EnemyHUD.hud.BossBar.DifficulyDisplay.BossIcon,
+		EnemyHUD.hud.BossBar.DifficulyDisplay.DemonIcon,
+        EnemyHUD.hud.BossBar.DifficulyDisplay.DevilIcon
+	}
     
-    local effectInfo = TweenInfo.new(0.3, Enum.EasingStyle.Linear)
-    local textInfo = TweenInfo.new(2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-
-    ts:Create(effectClone.Effect, effectInfo, {Size = UDim2.new(10,0,10,0), ImageTransparency = 1}):Play()
-    ts:Create(effectClone, textInfo, {Size = UDim2.new(0.6,0,0.6,0)}):Play()
-    task.wait(2)
-    ts:Create(effectClone, effectInfo, {ImageTransparency = 1}):Play()
-
-    for i,v in ipairs(effectClone.DisplayLevel:GetChildren()) do
-        if v:IsA("ImageLabel") then
-            ts:Create(v, effectInfo, {ImageTransparency = 1}):Play()
-        end
-    end
-
-    task.wait(0.225)
-    effectClone:Destroy()
+    RunService.RenderStepped:Connect(function()
+        EnemyHUD.currentEnemy = getEnemyOnScreen()
+        if EnemyHUD.currentEnemy ~= lastEnemy then
+            EnemyHUD.updateEnemyDisplay()
+		end
+		lastEnemy = EnemyHUD.currentEnemy
+    end)
 end
 
 local currentEnemyUi = nil
 local onHealthChanged = nil
 
-function Hud:showEnemyUi()
-    local t = self.currentEnemy
+local function fadeOutEnemyDisplay()
+    if not currentEnemyUi then return end
+
+    local ti = TweenInfo.new(0.15, Enum.EasingStyle.Linear)
+
+	local oldUi = currentEnemyUi
+	for _, v in ipairs(oldUi:GetDescendants()) do
+		if v:IsA("Frame") then
+			TweenService:Create(v, ti, {BackgroundTransparency = 1}):Play()
+		elseif v:IsA("ImageLabel") then
+			TweenService:Create(v, ti, {BackgroundTransparency = 1, ImageTransparency = 1}):Play()
+		elseif v:IsA("UIStroke") then
+			TweenService:Create(v, ti, {Transparency = 1}):Play()
+		elseif v:IsA("TextLabel") then
+			TweenService:Create(v, ti, {BackgroundTransparency = 1, TextTransparency = 1, TextStrokeTransparency = 1}):Play()
+		end
+	end
+
+    local tween = TweenService:Create(oldUi, ti, {BackgroundTransparency = 1})
+	tween:Play()
+	tween.Completed:Wait()
+end
+
+local function fadeInEnemyDisplay(uiSettings)
+	if not currentEnemyUi then return end
+
 	local ti = TweenInfo.new(0.15, Enum.EasingStyle.Linear)
-	self.DisplayEnemyLevel.Visible = false
-	if onHealthChanged then
-		onHealthChanged:Disconnect()
-	end
-	if currentEnemyUi then
-		local oldUi = currentEnemyUi
-		for i,v in ipairs(oldUi:GetDescendants()) do
-			if v:IsA("Frame") then
-				ts:Create(v, ti, {BackgroundTransparency = 1}):Play()
-			elseif v:IsA("ImageLabel") then
-				ts:Create(v, ti, {BackgroundTransparency = 1, ImageTransparency = 1}):Play()
-			elseif v:IsA("UIStroke") then
-				ts:Create(v, ti, {Transparency = 1}):Play()
-			elseif v:IsA("TextLabel") then
-				ts:Create(v, ti, {BackgroundTransparency = 1, TextTransparency = 1, TextStrokeTransparency = 1}):Play()
-			end
+    
+	for _, v in ipairs(uiSettings) do
+		if v.object:IsA("Frame") then
+			TweenService:Create(v.object, ti, v.settings):Play()
+		elseif v.object:IsA("ImageLabel") then
+			TweenService:Create(v.object, ti, v.settings):Play()
+		elseif v.object:IsA("UIStroke") then
+			TweenService:Create(v.object, ti, v.settings):Play()
+		elseif v.object:IsA("TextLabel") then
+			TweenService:Create(v.object, ti, v.settings):Play()
 		end
-		
-		ts:Create(oldUi, ti, {BackgroundTransparency = 1}):Play()
-		task.delay(0.75, function()
-			oldUi:Destroy()
-		end)
-	end
-	
-	if t ~= nil then
-		local enemy = t.Parent
-		local data = enemy.stats
-		
-		if data.BossLevel.Value > 0 then
-			currentEnemyUi = self.BossHealthBar:Clone()
-			currentEnemyUi.MaxHealth.Text = t.MaxHealth
-			
-			for i,v in ipairs(currentEnemyUi.DifficulyDisplay:GetChildren()) do
-				v.Visible = false
-			end
-			if data.BossLevel.Value == 1 then
-				currentEnemyUi.DifficulyDisplay.BossIcon.Visible = true
-			elseif data.BossLevel.Value == 2 then
-				currentEnemyUi.DifficulyDisplay.DemonIcon.Visible = true
-			elseif data.BossLevel.Value == 3 then
-				currentEnemyUi.DifficulyDisplay.DevilIcon.Visible = true
-			end
-		else
-			currentEnemyUi = self.EnemyHealthBar:Clone()
-		end
-		
-		local transparencyTable = {}
-		for i,v in ipairs(currentEnemyUi:GetDescendants()) do
-			if v:IsA("Frame") then
-				transparencyTable[#transparencyTable + 1] = {v, v.BackgroundTransparency}
-				v.BackgroundTransparency = 1
-			elseif v:IsA("ImageLabel") then
-				transparencyTable[#transparencyTable + 1] = {v, v.BackgroundTransparency, v.ImageTransparency}
-				v.BackgroundTransparency = 1
-				v.ImageTransparency = 1
-			elseif v:IsA("UIStroke") then
-				transparencyTable[#transparencyTable + 1] = {v, v.Transparency}
-				v.Transparency = 1
-			elseif v:IsA("TextLabel") then
-				transparencyTable[#transparencyTable + 1] = {v, v.BackgroundTransparency, v.TextTransparency, v.TextStrokeTransparency}
-				v.BackgroundTransparency = 1
-				v.TextTransparency = 1
-				v.TextStrokeTransparency = 1
-			end
-			
-			currentEnemyUi.BackgroundTransparency = 1
-		end
-		
-		currentEnemyUi.Parent = self.ui.Clones
-		for i,v in ipairs(transparencyTable) do
-			if v[1]:IsA("Frame") then
-				ts:Create(v[1], ti, {BackgroundTransparency = v[2]}):Play()
-			elseif v[1]:IsA("ImageLabel") then
-				ts:Create(v[1], ti, {BackgroundTransparency = v[2], ImageTransparency = v[3]}):Play()
-			elseif v[1]:IsA("UIStroke") then
-				ts:Create(v[1], ti, {Transparency = v[2]}):Play()
-			elseif v[1]:IsA("TextLabel") then
-				ts:Create(v[1], ti, {BackgroundTransparency = v[2], TextTransparency = v[3], TextStrokeTransparency = v[4]}):Play()
-			end
-			
-			ts:Create(currentEnemyUi, ti, {BackgroundTransparency = 0.5}):Play()
-		end
-		
-		currentEnemyUi.Visible = true
-		self.DisplayEnemyLevel.Visible = true
-		
-		currentEnemyUi.NameDisplay.Text = enemy.Name
-		self.DisplayEnemyLevel.Text = data.Level.Value
-		
-		currentEnemyUi.HealthBar.Size = UDim2.new(t.Health / t.MaxHealth, 0, 2, 0)
-		currentEnemyUi.Health.Text = math.floor(t.Health)
-		onHealthChanged = t.HealthChanged:Connect(function(h)
-			local p = h / t.MaxHealth
-			currentEnemyUi.HealthBar:TweenSize(UDim2.new(p, 0, 2, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quint, 0.25, true)
-			
-			currentEnemyUi.HealthBar.HealthChanged.Text = math.floor(tonumber(currentEnemyUi.Health.Text) - h)
-			currentEnemyUi.HealthBar.HealthChanged.Visible = true
-			
-			currentEnemyUi.Health.Text = math.floor(h)
-			
-			currentEnemyUi.HealthBar.HealthChanged.TextTransparency = 0
-			currentEnemyUi.HealthBar.HealthChanged.Line.BackgroundTransparency = 0
-			
-			local ti = TweenInfo.new(0.9, Enum.EasingStyle.Linear)
-			ts:Create(currentEnemyUi.HealthBar.HealthChanged, ti, {TextTransparency = 1}):Play()
-			local fadeTween = ts:Create(currentEnemyUi.HealthBar.HealthChanged.Line, ti, {BackgroundTransparency = 1})
-			fadeTween:Play()
-			fadeTween.Completed:Connect(function()
-				if fadeTween.PlaybackState ~= Enum.PlaybackState.Cancelled then
-					currentEnemyUi.HealthBar.HealthChanged.Visible = false
-				end
-			end)
-		end)
+
+		TweenService:Create(currentEnemyUi, ti, {BackgroundTransparency = 0.5}):Play()
 	end
 end
 
-return Hud
+function EnemyHUD.updateEnemyDisplay()
+    if onHealthChanged then
+		onHealthChanged:Disconnect()
+	end
+    
+	EnemyHUD.DisplayEnemyLevel.Visible = false
+
+    fadeOutEnemyDisplay()
+
+	local currentTarget = EnemyHUD.currentEnemy
+	if not currentTarget then return end
+
+	local enemy = currentTarget.Parent
+	local data = EnemyData[enemy.Name] or EnemyData.Default
+
+	for _, icon in pairs(EnemyHUD.enemyIcons) do
+		icon.Visible = false
+	end
+
+	local isBoss = data.EnemyType > 0
+
+	if isBoss then -- TODO Make this not clone and instead get the already generated one.
+		currentEnemyUi = EnemyHUD.hud.BossBar
+		currentEnemyUi.MaxHealth.Text = currentTarget.MaxHealth
+		EnemyHUD.enemyIcons[data.EnemyType].Visible = true
+    else
+        currentEnemyUi = EnemyHUD.hud.EnemyBar
+	end
+
+	fadeInEnemyDisplay(isBoss and EnemyHUD.bossUiSettings or EnemyHUD.enemyUiSettings)
+
+	currentEnemyUi.Visible = true
+	EnemyHUD.DisplayEnemyLevel.Visible = true
+
+	currentEnemyUi.NameDisplay.Text = enemy.Name
+	EnemyHUD.DisplayEnemyLevel.Text = data.Level
+
+	currentEnemyUi.HealthBar.Size = UDim2.new(currentTarget.Health / currentTarget.MaxHealth, 0, 2, 0)
+	currentEnemyUi.Health.Text = math.floor(currentTarget.Health)
+	onHealthChanged = currentTarget.HealthChanged:Connect(function(h)
+		local p = h / currentTarget.MaxHealth
+		currentEnemyUi.HealthBar:TweenSize(UDim2.new(p, 0, 2, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quint, 0.25, true)
+
+		currentEnemyUi.HealthBar.HealthChanged.Text = math.floor(tonumber(currentEnemyUi.Health.Text) - h)
+		currentEnemyUi.HealthBar.HealthChanged.Visible = true
+
+		currentEnemyUi.Health.Text = math.floor(h)
+
+		currentEnemyUi.HealthBar.HealthChanged.TextTransparency = 0
+		currentEnemyUi.HealthBar.HealthChanged.Line.BackgroundTransparency = 0
+
+		local ti = TweenInfo.new(0.9, Enum.EasingStyle.Linear)
+		TweenService:Create(currentEnemyUi.HealthBar.HealthChanged, ti, {TextTransparency = 1}):Play()
+		local fadeTween = TweenService:Create(currentEnemyUi.HealthBar.HealthChanged.Line, ti, {BackgroundTransparency = 1})
+		fadeTween:Play()
+		fadeTween.Completed:Connect(function()
+			if fadeTween.PlaybackState ~= Enum.PlaybackState.Cancelled then
+				currentEnemyUi.HealthBar.HealthChanged.Visible = false
+			end
+		end)
+	end)
+end
+
+return EnemyHUD
